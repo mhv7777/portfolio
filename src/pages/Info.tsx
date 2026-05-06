@@ -6,13 +6,15 @@ const Info: React.FC = () => {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState<'idle'|'sending'|'sent'|'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // change this path to your temp image or replace with an imported asset
   const placeholderImage = 'me-copy.png';
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email || !message) { setStatus('error'); return; }
+    setErrorMsg(null);
+    if (!name || !email || !message) { setStatus('error'); setErrorMsg('Please fill all fields.'); return; }
     setStatus('sending');
     try {
       const res = await fetch('/api', {
@@ -26,10 +28,12 @@ const Info: React.FC = () => {
       } else {
         console.error('contact error', json);
         setStatus('error');
+        setErrorMsg(json?.error || 'Failed to send');
       }
     } catch (err) {
       console.error('contact send failed', err);
       setStatus('error');
+      setErrorMsg(String(err));
     }
   };
 
@@ -171,7 +175,7 @@ const Info: React.FC = () => {
               {status === 'sending' ? 'Sending…' : status === 'sent' ? 'Sent' : 'Contact'}
             </button>
 
-            {status === 'error' && <div style={{ color: '#ff6b6b', marginTop: 6 }}>Please fill all fields or try again.</div>}
+            {errorMsg && <div style={{ color: '#ff6b6b', marginTop: 6 }}>{errorMsg}</div>}
           </form>
         </aside>
       </div>
