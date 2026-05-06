@@ -8,12 +8,16 @@ const FROM = process.env.RESEND_FROM_EMAIL || `Contact Form <no-reply@miguelhver
 export async function POST(req: Request) {
   if (!resend) {
     console.error('Resend not configured: RESEND_API_KEY missing');
-    return Response.json({ success: false, error: 'Email provider not configured' }, { status: 500 });
+    return new Response(JSON.stringify({ success: false, error: 'Email provider not configured' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   try {
     const body = await req.json();
     console.log('/api POST body:', body);
+
     const name = String(body?.name || '').trim();
     const email = String(body?.email || '').trim();
     const message = String(body?.message || '').trim();
@@ -21,7 +25,10 @@ export async function POST(req: Request) {
 
     if (!name || !email || !message) {
       console.warn('Missing fields in contact form', { name, email, message });
-      return Response.json({ success: false, error: 'Missing name, email or message' }, { status: 400 });
+      return new Response(JSON.stringify({ success: false, error: 'Missing name, email or message' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     const subject = projectId ? `Website contact — project ${projectId}` : `Website contact from ${name}`;
@@ -31,13 +38,7 @@ export async function POST(req: Request) {
       to: CONTACT_TO,
       subject,
       replyTo: email,
-      text: `
-Name: ${name}
-Email: ${email}
-${projectId ? `Project: ${projectId}` : ''}
-
-${message}
-      `,
+      text: `Name: ${name}\nEmail: ${email}\n${projectId ? `Project: ${projectId}\n` : ''}\n${message}`,
       html: `<p><strong>Name:</strong> ${name}</p>
              <p><strong>Email:</strong> ${email}</p>
              ${projectId ? `<p><strong>Project:</strong> ${projectId}</p>` : ''}
@@ -46,10 +47,17 @@ ${message}
     });
 
     console.log('Resend send result:', sendResult);
-    return Response.json({ success: true, id: (sendResult as any)?.id || null });
+    return new Response(JSON.stringify({ success: true, id: (sendResult as any)?.id || null }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (err: any) {
     console.error('contact send error', err);
     const msg = String(err?.message || err);
-    return Response.json({ success: false, error: msg }, { status: 500 });
+    const stack = err?.stack ? String(err.stack).slice(0, 2000) : undefined;
+    return new Response(JSON.stringify({ success: false, error: msg, stack }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
