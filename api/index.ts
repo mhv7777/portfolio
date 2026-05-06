@@ -35,18 +35,43 @@ export async function POST(req: Request) {
 
     const subject = projectId ? `Website contact — project ${projectId}` : `Website contact from ${name}`;
 
-    const sendResult = await resend.emails.send({
-      from: FROM,
+    // sanitize inputs
+    const safeName = String(name).replace(/<[^>]*>/g, '').trim();
+    const safeEmail = String(email).trim();
+    const safeMessage = String(message).replace(/<[^>]*>/g, '').trim();
+
+    // build a reliable From: header
+    // prefer explicit RESEND_FROM_EMAIL and optional RESEND_FROM_NAME env vars
+    const envFromEmail = (process.env.RESEND_FROM_EMAIL || '').trim();
+    const envFromName = (process.env.RESEND_FROM_NAME || '').trim() || 'Contact Form';
+    const fromEmail = envFromEmail || 'no-reply@miguelhverduzco.com';
+    const formattedFrom = `${envFromName} <${fromEmail}>`;
+
+    // ensure email looks valid
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(safeEmail)) {
+      return new Response(JSON.stringify({ success: false, error: 'Invalid email address' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const payload: any = {
+      from: formattedFrom,
       to: CONTACT_TO,
       subject,
-      replyTo: email,
-      text: `Name: ${name}\nEmail: ${email}\n${projectId ? `Project: ${projectId}\n` : ''}\n${message}`,
-      html: `<p><strong>Name:</strong> ${name}</p>
-             <p><strong>Email:</strong> ${email}</p>
+      // include both reply_to and explicit header for compatibility
+      reply_to: safeEmail,
+      headers: { 'Reply-To': safeEmail },
+      text: `Name: ${safeName}\nEmail: ${safeEmail}\n${projectId ? `Project: ${projectId}\n` : ''}\n${safeMessage}`,
+      html: `<p><strong>Name:</strong> ${safeName}</p>
+             <p><strong>Email:</strong> ${safeEmail}</p>
              ${projectId ? `<p><strong>Project:</strong> ${projectId}</p>` : ''}
              <hr/>
-             <p>${String(message).replace(/\n/g, '<br/>')}</p>`,
-    });
+             <p>${safeMessage.replace(/\n/g, '<br/>')}</p>`,
+    };
+
+    // cast resend.emails.send to any to avoid TS type mismatch for reply_to/header fields
+    const sendResult = await (resend as any).emails.send(payload);
 
     console.log('Resend send result:', sendResult);
     return new Response(JSON.stringify({ success: true, id: (sendResult as any)?.id || null }), {
