@@ -61,7 +61,8 @@ const Header: React.FC<HeaderProps> = ({ selectedCategory, onSelectCategory, sel
 
   return (
     <header className="header-grid px-8 py-6 text-white">
-      <div className="text-left space-y-1 text-xs uppercase tracking-wide">
+      {/* keep categories visible on desktop, hide on narrow screens to simplify mobile */}
+      <div className="text-left space-y-1 text-xs uppercase tracking-wide hidden sm:block">
         {categories.map((cat, i) => (
           <p
             key={i}
@@ -74,7 +75,8 @@ const Header: React.FC<HeaderProps> = ({ selectedCategory, onSelectCategory, sel
       </div>
 
       <div className="header-center text-center">
-        <h1 className="text-4xl font-serif">MIGUEL HILARIO VERDUZCO</h1>
+        {/* smaller on mobile, original size on tablet+ */}
+        <h1 className="text-3xl md:text-4xl font-serif">MIGUEL HILARIO VERDUZCO</h1>
 
         <div className="role-toggle mt-2" aria-hidden={false}>
           <span

@@ -113,7 +113,7 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
         try {
           if (container) {
             const sep = src.includes('?') ? '&' : '?';
-            container.innerHTML = `<iframe src="${src}${sep}autoplay=${autoplay ? '1' : '0'}&muted=1&playsinline=1&controls=0&loop=1" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%"></iframe>`;
+            container.innerHTML = `<iframe src="${src}${sep}autoplay=${autoplay ? '1' : '0'}&muted=1&playsinline=1&controls=0&loop=1" frameborder="0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%"></iframe>`;
             setMuted(true);
           }
         } catch {}
@@ -157,7 +157,9 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
       const curVol = await p.getVolume();
       lastVolumeRef.current = (typeof curVol === 'number' && curVol > 0) ? curVol : lastVolumeRef.current || 1;
       if (muted) {
+        // unmute: restore volume and attempt to play to satisfy mobile user-gesture policy
         await p.setVolume(lastVolumeRef.current || 1);
+        try { await p.play(); } catch (e) { /* ignore play rejection */ }
         setMuted(false);
       } else {
         await p.setVolume(0);

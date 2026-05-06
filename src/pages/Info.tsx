@@ -15,26 +15,106 @@ const Info: React.FC = () => {
     if (!name || !email || !message) { setStatus('error'); return; }
     setStatus('sending');
     try {
-      await fetch('/api/contact', {
+      const res = await fetch('/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, message }),
       });
-      setStatus('sent'); setName(''); setEmail(''); setMessage('');
-    } catch {
+      const json = await res.json();
+      if (res.ok && json?.success) {
+        setStatus('sent'); setName(''); setEmail(''); setMessage('');
+      } else {
+        console.error('contact error', json);
+        setStatus('error');
+      }
+    } catch (err) {
+      console.error('contact send failed', err);
       setStatus('error');
     }
   };
 
   return (
-    <main style={{ padding: '2.5rem 3rem', color: '#ddd', maxWidth: 1000, margin: '0 auto' }}>
-      <Link to="/" style={{ color: '#EDEDED', textDecoration: 'none', display: 'inline-block', marginBottom: 16 }}>
+    <main style={{ padding: '2.5rem 1.25rem', color: '#ddd', maxWidth: 1000, margin: '0 auto' }}>
+      {/* Responsive styles scoped to this component */}
+      <style>{`
+        .info-grid {
+          display: grid;
+          grid-template-columns: 1fr 360px;
+          gap: 28px;
+          align-items: start;
+        }
+        .info-aside {
+          background: #111;
+          padding: 16px;
+          border-radius: 6px;
+        }
+        .info-aside img {
+          width: 100%;
+          height: 300px;
+          object-fit: cover;
+          background: #222;
+          display: block;
+          border-radius: 4px;
+        }
+        .info-input, .info-textarea, .info-button {
+          width: 100%;
+          box-sizing: border-box;
+          font-size: 14px;
+        }
+        .info-input, .info-textarea {
+          padding: 10px;
+          border-radius: 6px;
+          border: 1px solid #222;
+          background: #0b0b0b;
+          color: #fff;
+        }
+        .info-button {
+          margin-top: 8px;
+          padding: 10px 12px;
+          background: #111;
+          color: #EDEDED;
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 6px;
+          cursor: pointer;
+        }
+        .info-button[disabled] {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .info-back {
+          color: #EDEDED;
+          text-decoration: none;
+          display: inline-block;
+          margin-bottom: 16px;
+          font-size: 14px;
+        }
+
+        /* Mobile / tablet: collapse to single column and adjust sizes */
+        @media (max-width: 820px) {
+          .info-grid {
+            grid-template-columns: 1fr;
+          }
+          .info-aside img {
+            height: 200px;
+            border-radius: 4px;
+          }
+          .info-button {
+            padding: 12px;
+          }
+          main { padding: 20px 14px; }
+        }
+      `}</style>
+
+      <Link to="/" className="info-back">
         ← Back
       </Link>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 28, alignItems: 'start' }}>
+      <div className="info-grid">
         <section>
-          <h1 style={{ margin: '0 0 8px 0', fontFamily: 'Playfair Display, serif', color: '#fff' }}>Information</h1>
+          <h1 style={{ margin: '0 0 8px 0', fontFamily: 'Playfair Display, serif', color: '#fff', fontSize: 28 }}>
+            Information
+          </h1>
+
           <p style={{ color: '#bdbdbd', marginTop: 0 }}>
             For inquiries, collaborations, or just to say hi, feel free to reach out using the contact form. I’m always open to discussing new projects, sharing ideas, or connecting with fellow creatives.
           </p>
@@ -47,33 +127,47 @@ const Info: React.FC = () => {
           </div>
         </section>
 
-        <aside style={{ background: '#111', padding: 16, borderRadius: 6 }}>
+        <aside className="info-aside" aria-labelledby="contact-heading">
           <div style={{ marginBottom: 12 }}>
             <img
               src={placeholderImage}
               alt="Photo placeholder"
-              style={{
-                width: '100%',
-                height: 300,
-                objectFit: 'cover',
-                background: '#222',
-                display: 'block',
-                borderRadius: 4,
-              }}
             />
           </div>
 
-          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }} aria-describedby="contact-heading">
             <label style={{ fontSize: 12, color: '#bdbdbd' }}>Name</label>
-            <input value={name} onChange={e => setName(e.target.value)} style={{ padding: 8, borderRadius: 4, border: '1px solid #222', background: '#0b0b0b', color: '#fff' }} />
+            <input
+              className="info-input"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              aria-label="Your name"
+            />
 
             <label style={{ fontSize: 12, color: '#bdbdbd' }}>Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={{ padding: 8, borderRadius: 4, border: '1px solid #222', background: '#0b0b0b', color: '#fff' }} />
+            <input
+              className="info-input"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              aria-label="Your email"
+            />
 
             <label style={{ fontSize: 12, color: '#bdbdbd' }}>Message</label>
-            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={4} style={{ padding: 8, borderRadius: 4, border: '1px solid #222', background: '#0b0b0b', color: '#fff' }} />
+            <textarea
+              className="info-textarea"
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              rows={4}
+              aria-label="Message"
+            />
 
-            <button type="submit" disabled={status === 'sending'} style={{ marginTop: 6, padding: '8px 10px', background: '#111', color: '#EDEDED', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4, cursor: 'pointer' }}>
+            <button
+              type="submit"
+              disabled={status === 'sending'}
+              className="info-button"
+              aria-busy={status === 'sending'}
+            >
               {status === 'sending' ? 'Sending…' : status === 'sent' ? 'Sent' : 'Contact'}
             </button>
 
