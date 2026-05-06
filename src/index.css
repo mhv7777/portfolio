@@ -1,0 +1,196 @@
+:root{
+  --muted: #b3b3b3;
+  --bg: #000;
+  --soft-white: #f5f5f5;
+}
+
+/* page base */
+html,body,#root {
+  height: 100%;
+  background: var(--bg);
+}
+body {
+  color: var(--soft-white);
+  font-family: 'IBM Plex Mono', 'Menlo', 'Monaco', monospace;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  opacity: 0;
+  animation: page-fade-in 260ms ease forwards;
+}
+
+/* fade-in on load */
+@keyframes page-fade-in {
+  to { opacity: 1; }
+}
+
+/* header grid: left / center / right — center locked */
+.header-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2.25rem 4rem 0 4rem;
+  gap: 0;
+}
+
+/* left nav — subdued so it doesn't compete with title */
+.header-grid .text-left {
+  justify-self: start;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 2.2;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.56;
+}
+
+/* make active item stand out */
+.header-grid .text-left p {
+  margin: 0.22rem 0;
+  cursor: pointer;
+  transition: opacity 160ms ease, color 160ms ease;
+}
+.header-grid .text-left p:hover { opacity: 0.7; }
+.header-grid .text-left p.font-bold { opacity: 1; color: #fff; }
+
+/* center content */
+.header-center {
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+
+/* main name dominance */
+.header-center h1 {
+  margin: 0;
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  /* reduced 10% from 4.25rem -> 3.825rem */
+  font-size: 3.825rem;
+  line-height: 1;
+  /* slightly softened white */
+  color: #EDEDED;
+}
+
+/* role toggle - typographic & subtle */
+.role-toggle {
+  font-family: 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.65rem;
+  margin-top: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.role-toggle span {
+  opacity: 0.56;
+  transition: opacity 260ms ease, text-shadow 260ms ease, transform 260ms ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+.role-toggle .role-active,
+.role-toggle .all-active {
+  opacity: 1;
+  text-shadow: 0 0 10px rgba(255,255,255,0.06); /* very soft glow */
+  transform: translateY(-1px);
+}
+
+/* subtle crossfade animation helper (applies while idle) */
+.role-toggle .plus.animating {
+  animation: pulse-plus 2.4s infinite;
+}
+@keyframes pulse-plus {
+  0% { text-shadow: 0 0 0 rgba(255,255,255,0); transform: translateY(0); }
+  50% { text-shadow: 0 0 6px rgba(255,255,255,0.035); transform: translateY(-1px); }
+  100% { text-shadow: 0 0 0 rgba(255,255,255,0); transform: translateY(0); }
+}
+
+/* right column */
+.header-grid .text-right {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* main spacing between header and grid */
+main {
+  padding: 3.25rem 4rem 4rem 4rem; /* more negative space under header */
+  box-sizing: border-box;
+}
+
+/* project grid: slightly more vertical rhythm */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2.25rem 2rem; /* more vertical breathing room */
+  margin-top: 1.25rem;
+}
+
+/* project card spacing and transition */
+.project-card {
+  transition: opacity 180ms ease, transform 180ms ease;
+  opacity: 1;
+}
+
+/* faded non-matches still occupy layout */
+.project-card.fade-nonmatch { opacity: 0.12; pointer-events: none; }
+
+/* project title: smaller and lightened to avoid competing with header */
+.project-card .project-title {
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  margin: 0 0 0.45rem 0;
+  color: #fff;
+  opacity: 0.95;
+  font-weight: 400;
+}
+
+/* 16:9 thumb container */
+.project-card .project-thumb {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%; /* 16:9 */
+  background: #e6e6e6;
+  overflow: hidden;
+  border-radius: 0;
+  transition: transform 200ms ease, filter 200ms ease;
+}
+
+/* background image occupying area */
+.project-card .project-thumb > .bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: contrast(0.98) saturate(0.98);
+  transform: translateZ(0);
+  transition: transform 200ms ease, filter 200ms ease;
+}
+
+/* subtle hover microinteraction: increase contrast/sharpness and slight scale */
+.project-card:hover .project-thumb { transform: translateY(-4px); }
+.project-card:hover .project-thumb > .bg { filter: contrast(1.04) saturate(1.02); transform: scale(1.02); }
+
+/* responsive */
+@media (max-width: 1200px) {
+  .project-grid { grid-template-columns: repeat(2, 1fr); }
+  .header-center h1 { font-size: 3.2rem; }
+}
+@media (max-width: 700px) {
+  .project-grid { grid-template-columns: 1fr; gap: 1rem; }
+  .header-grid { padding: 1rem; grid-template-columns: auto 1fr auto; }
+  .header-center h1 { font-size: 1.8rem; letter-spacing: 0.08em; }
+}
