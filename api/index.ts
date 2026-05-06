@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const DEFAULT_RECIPIENT = 'miguelhverduzco@gmail.com';
 const CONTACT_TO = process.env.CONTACT_TO_EMAIL || DEFAULT_RECIPIENT;
-const FROM = process.env.RESEND_FROM_EMAIL || `Contact Form <no-reply@vercel.app>`;
+const FROM = process.env.RESEND_FROM_EMAIL || `Contact Form <no-reply@miguelhverduzco.com>`;
 
 export async function POST(req: Request) {
   if (!resend) {
