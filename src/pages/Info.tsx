@@ -16,22 +16,30 @@ const Info: React.FC = () => {
     setErrorMsg(null);
     if (!name || !email || !message) { setStatus('error'); setErrorMsg('Please fill all fields.'); return; }
     setStatus('sending');
+
     try {
       const res = await fetch('/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, message }),
       });
-      const json = await res.json();
+
+      // read raw text so we can show HTML or JSON
+      const raw = await res.text();
+      let json: any = null;
+      try { json = raw ? JSON.parse(raw) : null; } catch (parseErr) { /* not JSON */ }
+
       if (res.ok && json?.success) {
         setStatus('sent'); setName(''); setEmail(''); setMessage('');
       } else {
-        console.error('contact error', json);
+        // build a helpful error message
+        const bodyPreview = json ? JSON.stringify(json, null, 2) : raw.slice(0, 2000);
+        console.error('Contact send failed', { status: res.status, statusText: res.statusText, body: raw });
         setStatus('error');
-        setErrorMsg(json?.error || 'Failed to send');
+        setErrorMsg(`Request failed: ${res.status} ${res.statusText}\n\nResponse body:\n${bodyPreview}`);
       }
-    } catch (err) {
-      console.error('contact send failed', err);
+    } catch (err: any) {
+      console.error('contact send failed (network)', err);
       setStatus('error');
       setErrorMsg(String(err));
     }
