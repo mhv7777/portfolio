@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A portfolio application to showcase video projects with an admin panel for managing uploads.",
   "main": "src/index.tsx",
+  "type": "module",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",

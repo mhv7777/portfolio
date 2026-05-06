@@ -5,6 +5,8 @@ const DEFAULT_RECIPIENT = 'miguelhverduzco@gmail.com';
 const CONTACT_TO = process.env.CONTACT_TO_EMAIL || DEFAULT_RECIPIENT;
 const FROM = process.env.RESEND_FROM_EMAIL || `Contact Form <no-reply@miguelhverduzco.com>`;
 
+console.log('RESEND configured?', !!process.env.RESEND_API_KEY, 'CONTACT_TO set?', !!process.env.CONTACT_TO_EMAIL);
+
 export async function POST(req: Request) {
   if (!resend) {
     console.error('Resend not configured: RESEND_API_KEY missing');

@@ -18,7 +18,7 @@ const Info: React.FC = () => {
     setStatus('sending');
 
     try {
-      const res = await fetch('/api/route', {
+      const res = await fetch('/api/index', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, message }),
