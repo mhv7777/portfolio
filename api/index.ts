@@ -56,18 +56,16 @@ export async function POST(req: Request) {
     }
 
     const payload: any = {
-      from: formattedFrom,
-      to: CONTACT_TO,
-      subject,
-      // include both reply_to and explicit header for compatibility
-      reply_to: safeEmail,
-      headers: { 'Reply-To': safeEmail },
-      text: `Name: ${safeName}\nEmail: ${safeEmail}\n${projectId ? `Project: ${projectId}\n` : ''}\n${safeMessage}`,
-      html: `<p><strong>Name:</strong> ${safeName}</p>
-             <p><strong>Email:</strong> ${safeEmail}</p>
-             ${projectId ? `<p><strong>Project:</strong> ${projectId}</p>` : ''}
-             <hr/>
-             <p>${safeMessage.replace(/\n/g, '<br/>')}</p>`,
+        from: formattedFrom,
+        to: CONTACT_TO,
+        subject,
+        reply_to: safeEmail,
+        text: `Name: ${safeName}\nEmail: ${safeEmail}\n${projectId ? `Project: ${projectId}\n` : ''}\n${safeMessage}`,
+        html: `<p><strong>Name:</strong> ${safeName}</p>
+                <p><strong>Email:</strong> ${safeEmail}</p>
+                ${projectId ? `<p><strong>Project:</strong> ${projectId}</p>` : ''}
+                <hr/>
+                <p>${safeMessage.replace(/\n/g, '<br/>')}</p>`,
     };
 
     // cast resend.emails.send to any to avoid TS type mismatch for reply_to/header fields
