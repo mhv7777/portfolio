@@ -79,24 +79,29 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
         applyIframeStyles(iframe);
         container.appendChild(iframe);
 
-        // instantiate Player using the iframe element (most reliable)
-        localPlayer = new Player(iframe as HTMLIFrameElement);
-
-        playerRef.current = localPlayer;
-
-        // ensure iframe fills container after player creates it
-        const forceFill = () => {
+        // instantiate Player after iframe is loaded (more reliable on deployed sites)
+        const initFromIframe = async () => {
           try {
-            const frame = container.querySelector('iframe') as HTMLIFrameElement | null;
-            applyIframeStyles(frame);
-            // ensure container has positioning so absolute iframe fits
-            if (container instanceof HTMLElement) {
-              if (!container.style.position) container.style.position = 'relative';
+            // wait for iframe load so player.js inside iframe can initialize
+            if (!iframe.contentWindow || iframe.contentWindow.length === 0) {
+              await new Promise<void>((resolve) => {
+                iframe.addEventListener('load', () => resolve(), { once: true });
+                // fallback timeout in case load never fires
+                setTimeout(() => resolve(), 3000);
+              });
             }
-          } catch {}
+
+            // attempt to construct player from iframe
+            localPlayer = new Player(iframe as HTMLIFrameElement);
+            playerRef.current = localPlayer;
+            console.log('Player instantiated from iframe on', window.location.hostname);
+
+            try { await localPlayer.ready(); } catch (err) { console.warn('player.ready() failed', err); }
+          } catch (err) {
+            console.error('Failed to init Player from iframe', err);
+          }
         };
-        forceFill();
-        try { await localPlayer.ready(); forceFill(); } catch {}
+        initFromIframe();
 
         // initial volume state
         try {
