@@ -61,26 +61,26 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
         // clear any previous content
         container.innerHTML = '';
 
-        // prefer numeric Vimeo id when possible
+        // prefer numeric Vimeo id when possible — create an iframe first for reliability
         const vid = extractVimeoId(String(src));
+        const sep = String(src).includes('?') ? '&' : '?';
+        let iframeSrc: string;
         if (vid) {
-          localPlayer = new Player(container, {
-            id: Number(vid),
-            autoplay,
-            controls: false,
-            playsinline: true,
-            loop: true,
-          });
+          iframeSrc = `https://player.vimeo.com/video/${vid}${sep}autoplay=${autoplay ? '1' : '0'}&muted=1&playsinline=1&controls=0&loop=1`;
         } else {
-          // fallback to using the full url
-          localPlayer = new Player(container, {
-            url: src as any,
-            autoplay,
-            controls: false,
-            playsinline: true,
-            loop: true,
-          });
+          // if src is already an embed url, use it; otherwise pass the raw url to the player via iframe src
+          iframeSrc = `${String(src)}${sep}autoplay=${autoplay ? '1' : '0'}&muted=1&playsinline=1&controls=0&loop=1`;
         }
+
+        const iframe = document.createElement('iframe');
+        iframe.src = iframeSrc;
+        iframe.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
+        iframe.allowFullscreen = true;
+        applyIframeStyles(iframe);
+        container.appendChild(iframe);
+
+        // instantiate Player using the iframe element (most reliable)
+        localPlayer = new Player(iframe as HTMLIFrameElement);
 
         playerRef.current = localPlayer;
 
