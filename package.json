@@ -11,7 +11,7 @@
     "eject": "react-scripts eject"
   },
   "dependencies": {
-    "@vimeo/player": "^2.30.3",
+    "@vimeo/player": "^2.30.4",
     "axios": "^1.11.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

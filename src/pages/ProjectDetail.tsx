@@ -3,6 +3,7 @@ import { useParams, useLocation, Link } from 'react-router-dom';
 import { Project } from '../types';
 import { getVimeoEmbedUrl } from '../utils/video';
 import CreditsList from '../components/CreditsList';
+import Player from '@vimeo/player';
 
 type LocationState = { project?: Project };
 
@@ -61,47 +62,29 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
         // clear any previous content
         container.innerHTML = '';
 
-        // prefer numeric Vimeo id when possible — create an iframe first for reliability
-        const vid = extractVimeoId(String(src));
-        const sep = String(src).includes('?') ? '&' : '?';
-        let iframeSrc: string;
-        if (vid) {
-          iframeSrc = `https://player.vimeo.com/video/${vid}${sep}autoplay=${autoplay ? '1' : '0'}&muted=1&playsinline=1&controls=0&loop=1`;
-        } else {
-          // if src is already an embed url, use it; otherwise pass the raw url to the player via iframe src
-          iframeSrc = `${String(src)}${sep}autoplay=${autoplay ? '1' : '0'}&muted=1&playsinline=1&controls=0&loop=1`;
+        // create a simple div container and instantiate the Vimeo Player directly on it
+        // this is reliable both locally and on deployed environments
+        const mount = document.createElement('div');
+        // ensure the mount fills the player container
+        mount.style.position = 'absolute';
+        mount.style.inset = '0';
+        container.appendChild(mount);
+
+        try {
+          localPlayer = new Player(mount, {
+            url: src as any,
+            autoplay,
+            muted: true,
+            loop: true,
+            controls: false,
+            playsinline: true,
+          });
+          playerRef.current = localPlayer;
+          try { await localPlayer.ready(); } catch (err) { console.warn('player.ready() failed', err); }
+          console.log('Player instantiated on element mount', window.location.hostname);
+        } catch (err) {
+          console.error('Failed to instantiate Player on mount element', err);
         }
-
-        const iframe = document.createElement('iframe');
-        iframe.src = iframeSrc;
-        iframe.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
-        iframe.allowFullscreen = true;
-        applyIframeStyles(iframe);
-        container.appendChild(iframe);
-
-        // instantiate Player after iframe is loaded (more reliable on deployed sites)
-        const initFromIframe = async () => {
-          try {
-            // wait for iframe load so player.js inside iframe can initialize
-            if (!iframe.contentWindow || iframe.contentWindow.length === 0) {
-              await new Promise<void>((resolve) => {
-                iframe.addEventListener('load', () => resolve(), { once: true });
-                // fallback timeout in case load never fires
-                setTimeout(() => resolve(), 3000);
-              });
-            }
-
-            // attempt to construct player from iframe
-            localPlayer = new Player(iframe as HTMLIFrameElement);
-            playerRef.current = localPlayer;
-            console.log('Player instantiated from iframe on', window.location.hostname);
-
-            try { await localPlayer.ready(); } catch (err) { console.warn('player.ready() failed', err); }
-          } catch (err) {
-            console.error('Failed to init Player from iframe', err);
-          }
-        };
-        initFromIframe();
 
         // initial volume state
         try {
