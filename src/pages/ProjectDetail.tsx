@@ -3,14 +3,13 @@ import { useParams, useLocation, Link } from 'react-router-dom';
 import { Project } from '../types';
 import { getVimeoEmbedUrl } from '../utils/video';
 import CreditsList from '../components/CreditsList';
-import Player from '@vimeo/player';
+import PlayerLib from '@vimeo/player';
 
 type LocationState = { project?: Project };
 
 const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean }> = ({ src, title, autoplay = true }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<any>(null);
-  const pollRef = useRef<number | null>(null);
   const lastVolumeRef = useRef<number>(1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [duration, setDuration] = useState<number>(0);
@@ -24,188 +23,89 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
     const container = containerRef.current;
     if (!src || !container) return;
     let mounted = true;
-    let localPlayer: any = null;
-    let localPoll: number | null = null;
-
-    const extractVimeoId = (u: string) => {
-      try {
-        const m = u.match(/(?:vimeo\.com\/(?:.*?\/)?|player\.vimeo\.com\/video\/)(\d+)/);
-        return m ? m[1] : null;
-      } catch {
-        return null;
-      }
-    };
-
-    const applyIframeStyles = (frame: HTMLIFrameElement | null) => {
-      try {
-        if (!frame) return;
-        frame.style.position = 'absolute';
-        frame.style.top = '0';
-        frame.style.left = '0';
-        frame.style.width = '100%';
-        frame.style.height = '100%';
-        frame.style.border = '0';
-      } catch {}
-    };
+    let player: any = null;
+    const mount = document.createElement('div');
+    mount.style.position = 'absolute';
+    mount.style.inset = '0';
+    // clear and append mount
+    container.innerHTML = '';
+    container.appendChild(mount);
 
     (async () => {
-      const cleanupPlayerListeners = (p: any) => {
-        try {
-          p?.off && typeof p.off === 'function' && p.off('play') && p.off('pause') && p.off('timeupdate') && p.off('ended');
-        } catch {}
-      };
-
       try {
-        const mod = await import('@vimeo/player');
-        const Player = (mod as any).default ?? (mod as any).Player ?? (mod as any);
+        // instantiate player using SDK (let it create the iframe)
+        player = new (PlayerLib as any)(mount, {
+          url: src as any,
+          autoplay: Boolean(autoplay),
+          muted: true, // start muted to satisfy autoplay policies
+          loop: true,
+          controls: false,
+          playsinline: true,
+        });
 
-        // clear any previous content
-        container.innerHTML = '';
+        playerRef.current = player;
 
-        // create a simple div container and instantiate the Vimeo Player directly on it
-        // this is reliable both locally and on deployed environments
-        const mount = document.createElement('div');
-        // ensure the mount fills the player container
-        mount.style.position = 'absolute';
-        mount.style.inset = '0';
-        container.appendChild(mount);
+        // wait for player to be ready before using API
+        try { await player.ready(); } catch (err) { console.warn('player.ready() warning', err); }
 
-        try {
-          localPlayer = new Player(mount, {
-            url: src as any,
-            autoplay,
-            muted: true,
-            loop: true,
-            controls: false,
-            playsinline: true,
-          });
-          playerRef.current = localPlayer;
-          try { await localPlayer.ready(); } catch (err) { console.warn('player.ready() failed', err); }
-          console.log('Player instantiated on element mount', window.location.hostname);
-        } catch (err) {
-          console.error('Failed to instantiate Player on mount element', err);
-        }
-
-        // initial volume state
-        try {
-          const vol = await localPlayer.getVolume();
-          lastVolumeRef.current = typeof vol === 'number' ? vol : 1;
-          setMuted(lastVolumeRef.current === 0);
-        } catch { lastVolumeRef.current = 1; }
-
-        if (autoplay) {
-          try { await localPlayer.setVolume(0); } catch {}
-          setMuted(true);
-          try { await localPlayer.play(); } catch {}
-        } else {
-          try {
-            const paused = await localPlayer.getPaused();
-            setIsPlaying(!paused);
-          } catch {}
-        }
+        if (!mounted) return;
 
         setHasPlayer(true);
 
-        // attach events
+        // initial state
         try {
-          localPlayer.on('play', () => { if (mounted) setIsPlaying(true); });
-          localPlayer.on('pause', () => { if (mounted) setIsPlaying(false); });
-          localPlayer.getDuration().then((d: number) => { if (mounted) setDuration(Math.floor(d || 0)); }).catch(()=>{});
-          localPlayer.on('timeupdate', (data: any) => { if (mounted) setTime(Math.floor(data.seconds || 0)); });
-          localPlayer.on('ended', async () => {
-            try { if (!mounted) return; await localPlayer.setCurrentTime(0); await localPlayer.play(); } catch {}
+          const d = await player.getDuration();
+          setDuration(Math.floor(d || 0));
+        } catch {}
+
+        try {
+          const t = await player.getCurrentTime();
+          setTime(Math.floor(t || 0));
+        } catch {}
+
+        try {
+          const paused = await player.getPaused();
+          setIsPlaying(!paused);
+        } catch {}
+
+        try {
+          const vol = await player.getVolume();
+          lastVolumeRef.current = typeof vol === 'number' ? vol : lastVolumeRef.current || 1;
+          setMuted(lastVolumeRef.current === 0);
+        } catch {}
+
+        // attach event handlers (no polling)
+        try {
+          player.on('play', () => { if (mounted) setIsPlaying(true); });
+          player.on('pause', () => { if (mounted) setIsPlaying(false); });
+          player.on('timeupdate', (data: any) => { if (mounted) setTime(Math.floor(data.seconds || 0)); });
+          player.on('ended', async () => {
+            if (!mounted) return;
+            try { await player.setCurrentTime(0); await player.play(); } catch {}
           });
-        } catch (e) { /* non-fatal */ }
-
-        // polling for conservative updates (keeps UI in sync)
-        if (localPoll) window.clearInterval(localPoll);
-        localPoll = window.setInterval(async () => {
-          if (!mounted || !localPlayer) return;
-          try {
-            const t = await localPlayer.getCurrentTime();
-            const d = await localPlayer.getDuration();
-            const paused = await localPlayer.getPaused();
-            if (mounted) {
-              setTime(Math.floor(t || 0));
-              setDuration(Math.floor(d || 0));
-              setIsPlaying(!paused);
-              try {
-                const v = await localPlayer.getVolume();
-                setMuted((typeof v === 'number' && v === 0));
-              } catch {}
-            }
-          } catch {}
-        }, 500);
-        pollRef.current = localPoll;
-      } catch (err) {
-        // fallback: inject iframe and attempt to attach a Player to the iframe element
-        try {
-          container.innerHTML = '';
-          const sep = String(src).includes('?') ? '&' : '?';
-          const iframe = document.createElement('iframe');
-          iframe.src = `${src}${sep}autoplay=${autoplay ? '1' : '0'}&muted=1&playsinline=1&controls=0&loop=1`;
-          iframe.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
-          iframe.allowFullscreen = true;
-          applyIframeStyles(iframe);
-          container.appendChild(iframe);
-          setMuted(true);
-
-          // try to attach player API to the iframe
-          try {
-            const mod2 = await import('@vimeo/player');
-            const Player2 = (mod2 as any).default ?? (mod2 as any).Player ?? (mod2 as any);
-            localPlayer = new Player2(iframe);
-            playerRef.current = localPlayer;
-            setHasPlayer(true);
-
-            // attach events and polling same as above
-            try {
-              await localPlayer.ready();
-            } catch {}
-            localPlayer.on && localPlayer.on('timeupdate', (data: any) => { if (mounted) setTime(Math.floor(data.seconds || 0)); });
-            if (localPoll) window.clearInterval(localPoll);
-            localPoll = window.setInterval(async () => {
-              if (!mounted || !localPlayer) return;
-              try {
-                const t = await localPlayer.getCurrentTime();
-                const d = await localPlayer.getDuration();
-                const paused = await localPlayer.getPaused();
-                if (mounted) {
-                  setTime(Math.floor(t || 0));
-                  setDuration(Math.floor(d || 0));
-                  setIsPlaying(!paused);
-                }
-              } catch {}
-            }, 500);
-            pollRef.current = localPoll;
-          } catch (e) {
-            // nothing else we can do — iframe will play but API may not be available
-          }
         } catch (e) {
-          // final fallback: leave container empty
+          console.warn('player event attach failed', e);
         }
+      } catch (err) {
+        console.error('Failed to initialize Vimeo Player', err);
       }
     })();
 
     return () => {
       mounted = false;
-      if (localPoll) window.clearInterval(localPoll);
-      const toUnload = localPlayer ?? playerRef.current;
-      if (toUnload && typeof toUnload.unload === 'function') {
-        try { toUnload.unload(); } catch {}
-      }
       try {
-        // attempt to remove event listeners if available
-        (playerRef.current as any)?.off && (playerRef.current as any).off('play');
-        (playerRef.current as any)?.off && (playerRef.current as any).off('pause');
-        (playerRef.current as any)?.off && (playerRef.current as any).off('timeupdate');
-        (playerRef.current as any)?.off && (playerRef.current as any).off('ended');
-      } catch {}
+        if (player) {
+          player.off && player.off('play');
+          player.off && player.off('pause');
+          player.off && player.off('timeupdate');
+          player.off && player.off('ended');
+          if (typeof player.unload === 'function') {
+            try { player.unload(); } catch {}
+          }
+        }
+      } catch (e) { /* ignore */ }
       playerRef.current = null;
-      pollRef.current = null;
-      if (container) {
-        try { container.innerHTML = ''; } catch {}
-      }
+      try { container.innerHTML = ''; } catch {}
     };
   }, [src, autoplay]);
 
@@ -217,14 +117,14 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
       const paused = await p.getPaused();
       if (paused) await p.play();
       else await p.pause();
-    } catch (e) { console.error('togglePlay error', e); }
+    } catch (e) {
+      console.error('togglePlay error', e);
+    }
   };
 
   const toggleMute = async () => {
     const p = safePlayer();
-    // allow mute/unmute attempt regardless; button always enabled visually
     if (!p) {
-      // if no player, just flip UI state for consistency
       setMuted(prev => !prev);
       return;
     }
@@ -233,9 +133,8 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
       const curVol = await p.getVolume();
       lastVolumeRef.current = (typeof curVol === 'number' && curVol > 0) ? curVol : lastVolumeRef.current || 1;
       if (muted) {
-        // unmute: restore volume and attempt to play to satisfy mobile user-gesture policy
         await p.setVolume(lastVolumeRef.current || 1);
-        try { await p.play(); } catch (e) { /* ignore play rejection */ }
+        try { await p.play(); } catch {}
         setMuted(false);
       } else {
         await p.setVolume(0);
@@ -269,7 +168,6 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
     } catch (e) { console.error('seek failed', e); }
   };
 
-  // styled range: red visual, non-interactive (visual only)
   const progressPercent = duration ? Math.min(100, Math.round((time / duration) * 100)) : 0;
 
   return (
@@ -296,12 +194,11 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
           min={0}
           max={100}
           value={progressPercent}
-          // visual-only: disable pointer interaction
           onChange={() => {}}
           aria-hidden
           style={{
             flex: 1,
-            accentColor: '#ff4d4f', /* modern browsers will color track/thumb */
+            accentColor: '#ff4d4f',
             height: 6,
             pointerEvents: 'none',
             background: 'transparent',
@@ -375,7 +272,6 @@ const ProjectDetail: React.FC = () => {
 
         {project.description ? <p style={{ marginTop: 12, lineHeight: 1.6 }}>{project.description}</p> : null}
 
-        {/* render structured credits */}
         <CreditsList credits={project.credits} />
       </div>
 
