@@ -25,8 +25,14 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
     let mounted = true;
     let player: any = null;
     const mount = document.createElement('div');
+    // ensure mount fills the container exactly
     mount.style.position = 'absolute';
-    mount.style.inset = '0';
+    mount.style.top = '0';
+    mount.style.left = '0';
+    mount.style.right = '0';
+    mount.style.bottom = '0';
+    mount.style.width = '100%';
+    mount.style.height = '100%';
     // clear and append mount
     container.innerHTML = '';
     container.appendChild(mount);
@@ -47,6 +53,26 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
 
         // wait for player to be ready before using API
         try { await player.ready(); } catch (err) { console.warn('player.ready() warning', err); }
+
+        // ensure the iframe that the SDK created fills the mount/container
+        try {
+          const iframe = mount.querySelector('iframe') as HTMLIFrameElement | null;
+          if (iframe) {
+            iframe.style.position = 'absolute';
+            iframe.style.top = '0';
+            iframe.style.left = '0';
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = '0';
+            // some environments add inline transforms / display rules — normalize them
+            iframe.style.display = iframe.style.display || 'block';
+            // ensure container has positioning so absolute iframe fits
+            if (container instanceof HTMLElement) {
+              container.style.position = container.style.position || 'relative';
+              container.style.overflow = container.style.overflow || 'hidden';
+            }
+          }
+        } catch (e) { /* non-fatal */ }
 
         if (!mounted) return;
 
