@@ -82,9 +82,13 @@ const Header: React.FC<HeaderProps> = ({ selectedCategory, onSelectCategory, sel
           .mobile-nav button { width: 100%; text-align: left; padding: 10px 12px; background: transparent; border: none; color: #cfcfcf; font-weight: 500; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
           .header-center h1 { font-size: clamp(1.05rem, 5.6vw, 1.75rem); line-height: 1.05; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
           .role-toggle { margin-top: 6px; display: flex; gap: 12px; justify-content: center; }
+
+          /* show a compact Info link on mobile (keeps it visible even though right column is hidden) */
+          .mobile-info { display: block !important; padding: 0 18px 12px; text-align: right; }
+          .mobile-info a { color: #EDEDED; text-decoration: none; padding: 6px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); display: inline-block; }
         }
         @media (min-width: 769px) {
-          .mobile-hamburger, .mobile-nav { display: none !important; }
+          .mobile-hamburger, .mobile-nav, .mobile-info { display: none !important; }
         }
       `}</style>
 
@@ -190,6 +194,11 @@ const Header: React.FC<HeaderProps> = ({ selectedCategory, onSelectCategory, sel
           </Link>
         </div>
       </header>
+
+      {/* Mobile-only Info link (visible when right column is hidden on mobile) */}
+      <div className="mobile-info" aria-hidden={!mobileOpen}>
+        <Link to="/info">Information</Link>
+      </div>
 
       {/* Mobile nav panel (collapsed left categories) */}
       <nav id="mobile-nav" className="mobile-nav" aria-hidden={!mobileOpen} style={{ display: mobileOpen ? 'block' : 'none' }}>
