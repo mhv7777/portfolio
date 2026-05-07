@@ -109,6 +109,18 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
             if (!mounted) return;
             try { await player.setCurrentTime(0); await player.play(); } catch {}
           });
+
+          // keep muted state in sync reliably in production by listening to volume changes
+          player.on('volumechange', async () => {
+            if (!mounted) return;
+            try {
+              const v = await player.getVolume();
+              lastVolumeRef.current = (typeof v === 'number') ? v : lastVolumeRef.current;
+              setMuted(lastVolumeRef.current === 0);
+            } catch (err) {
+              // ignore — best-effort
+            }
+          });
         } catch (e) {
           console.warn('player event attach failed', e);
         }
@@ -124,6 +136,7 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
           player.off && player.off('play');
           player.off && player.off('pause');
           player.off && player.off('timeupdate');
+          player.off && player.off('volumechange');
           player.off && player.off('ended');
           if (typeof player.unload === 'function') {
             try { player.unload(); } catch {}
@@ -156,15 +169,23 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
     }
     try {
       await p.ready();
+      // read current volume and keep a sensible lastVolumeRef
       const curVol = await p.getVolume();
-      lastVolumeRef.current = (typeof curVol === 'number' && curVol > 0) ? curVol : lastVolumeRef.current || 1;
+      const preserved = (typeof curVol === 'number' && curVol > 0) ? curVol : (lastVolumeRef.current || 1);
+      lastVolumeRef.current = preserved;
+
       if (muted) {
-        await p.setVolume(lastVolumeRef.current || 1);
-        try { await p.play(); } catch {}
-        setMuted(false);
+        // restore prior volume and verify
+        await p.setVolume(preserved);
+        const check = await p.getVolume();
+        const nowMuted = !(typeof check === 'number' && check > 0);
+        setMuted(nowMuted);
       } else {
+        // mute and verify
         await p.setVolume(0);
-        setMuted(true);
+        const check = await p.getVolume();
+        const nowMuted = !(typeof check === 'number' && check > 0);
+        setMuted(nowMuted);
       }
     } catch (e) {
       console.error('toggleMute error', e);
@@ -281,6 +302,9 @@ const ProjectDetail: React.FC = () => {
   const videoSrcRaw = (project as any).videoUrl || (project as any).originalVideoLink || (project as any).link || '';
   const videoSrc = getVimeoEmbedUrl(videoSrcRaw);
 
+  // helper: determine if there are extra assets to show under INFO
+  const hasAssets = Array.isArray((project as any)?.assets) && (project as any).assets.length > 0;
+
   return (
     <main style={{ padding: '3rem 4rem', textAlign: 'center' }}>
       <Link to="/" style={{ display: 'inline-block', marginBottom: '1rem', color: '#EDEDED', textDecoration: 'none' }}>
@@ -301,12 +325,12 @@ const ProjectDetail: React.FC = () => {
         <CreditsList credits={project.credits} />
       </div>
 
-      <section style={{ marginTop: 28 }}>
-        <h3 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#bdbdbd', marginBottom: '0.75rem' }}>
-          INFO
-        </h3>
+      {hasAssets && (
+        <section style={{ marginTop: 28 }}>
+          <h3 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.12em', color: '#bdbdbd', marginBottom: '0.75rem' }}>
+            INFO
+          </h3>
 
-        {Array.isArray((project as any).assets) && (project as any).assets.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
             {(project as any).assets.map((a: any, i: number) => (
               <div key={i} style={{ background: '#111', padding: 8 }}>
@@ -325,10 +349,8 @@ const ProjectDetail: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : (
-          <div style={{ color: '#8f8f8f' }}>No extra assets. Add photos / bts / other videos in the admin panel.</div>
-        )}
-      </section>
+        </section>
+      )}
     </main>
   );
 };
