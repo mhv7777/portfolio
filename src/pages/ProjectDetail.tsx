@@ -26,46 +26,83 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
     let localPlayer: any = null;
     let localPoll: number | null = null;
 
+    const extractVimeoId = (u: string) => {
+      try {
+        const m = u.match(/(?:vimeo\.com\/(?:.*?\/)?|player\.vimeo\.com\/video\/)(\d+)/);
+        return m ? m[1] : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const applyIframeStyles = (frame: HTMLIFrameElement | null) => {
+      try {
+        if (!frame) return;
+        frame.style.position = 'absolute';
+        frame.style.top = '0';
+        frame.style.left = '0';
+        frame.style.width = '100%';
+        frame.style.height = '100%';
+        frame.style.border = '0';
+      } catch {}
+    };
+
     (async () => {
+      const cleanupPlayerListeners = (p: any) => {
+        try {
+          p?.off && typeof p.off === 'function' && p.off('play') && p.off('pause') && p.off('timeupdate') && p.off('ended');
+        } catch {}
+      };
+
       try {
         const mod = await import('@vimeo/player');
-        const Player = mod.default ?? (mod as any).Player;
+        const Player = (mod as any).default ?? (mod as any).Player ?? (mod as any);
 
-        if (playerRef.current && typeof playerRef.current.unload === 'function') {
-          try { await playerRef.current.unload(); } catch {}
+        // clear any previous content
+        container.innerHTML = '';
+
+        // prefer numeric Vimeo id when possible
+        const vid = extractVimeoId(String(src));
+        if (vid) {
+          localPlayer = new Player(container, {
+            id: Number(vid),
+            autoplay,
+            controls: false,
+            playsinline: true,
+            loop: true,
+          });
+        } else {
+          // fallback to using the full url
+          localPlayer = new Player(container, {
+            url: src as any,
+            autoplay,
+            controls: false,
+            playsinline: true,
+            loop: true,
+          });
         }
 
-        localPlayer = new Player(container, {
-          url: src as any,
-          autoplay,
-          controls: false,
-          playsinline: true,
-          loop: true,
-        });
         playerRef.current = localPlayer;
 
-        // ensure iframe fills container (some embeds set fixed sizes)
-        const forceFillIframe = () => {
+        // ensure iframe fills container after player creates it
+        const forceFill = () => {
           try {
             const frame = container.querySelector('iframe') as HTMLIFrameElement | null;
-            if (frame) {
-              frame.style.position = 'absolute';
-              frame.style.top = '0';
-              frame.style.left = '0';
-              frame.style.width = '100%';
-              frame.style.height = '100%';
-              frame.style.border = '0';
+            applyIframeStyles(frame);
+            // ensure container has positioning so absolute iframe fits
+            if (container instanceof HTMLElement) {
+              if (!container.style.position) container.style.position = 'relative';
             }
-            (container as HTMLElement).style.position = (container as HTMLElement).style.position || 'absolute';
           } catch {}
         };
-        forceFillIframe();
-        try { localPlayer.ready().then(() => forceFillIframe()).catch(()=>{}); } catch {}
+        forceFill();
+        try { await localPlayer.ready(); forceFill(); } catch {}
 
+        // initial volume state
         try {
           const vol = await localPlayer.getVolume();
           lastVolumeRef.current = typeof vol === 'number' ? vol : 1;
-          setMuted((lastVolumeRef.current === 0));
+          setMuted(lastVolumeRef.current === 0);
         } catch { lastVolumeRef.current = 1; }
 
         if (autoplay) {
@@ -81,14 +118,18 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
 
         setHasPlayer(true);
 
-        localPlayer.on('play', () => { if (mounted) setIsPlaying(true); });
-        localPlayer.on('pause', () => { if (mounted) setIsPlaying(false); });
-        localPlayer.getDuration().then((d: number) => { if (mounted) setDuration(Math.floor(d || 0)); });
-        localPlayer.on('timeupdate', (data: any) => { if (mounted) setTime(Math.floor(data.seconds || 0)); });
-        localPlayer.on('ended', async () => {
-          try { if (!mounted) return; await localPlayer.setCurrentTime(0); await localPlayer.play(); } catch {}
-        });
+        // attach events
+        try {
+          localPlayer.on('play', () => { if (mounted) setIsPlaying(true); });
+          localPlayer.on('pause', () => { if (mounted) setIsPlaying(false); });
+          localPlayer.getDuration().then((d: number) => { if (mounted) setDuration(Math.floor(d || 0)); }).catch(()=>{});
+          localPlayer.on('timeupdate', (data: any) => { if (mounted) setTime(Math.floor(data.seconds || 0)); });
+          localPlayer.on('ended', async () => {
+            try { if (!mounted) return; await localPlayer.setCurrentTime(0); await localPlayer.play(); } catch {}
+          });
+        } catch (e) { /* non-fatal */ }
 
+        // polling for conservative updates (keeps UI in sync)
         if (localPoll) window.clearInterval(localPoll);
         localPoll = window.setInterval(async () => {
           if (!mounted || !localPlayer) return;
@@ -108,15 +149,53 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
           } catch {}
         }, 500);
         pollRef.current = localPoll;
-      } catch (err: any) {
-        // fallback: inject iframe into the captured container
+      } catch (err) {
+        // fallback: inject iframe and attempt to attach a Player to the iframe element
         try {
-          if (container) {
-            const sep = src.includes('?') ? '&' : '?';
-            container.innerHTML = `<iframe src="${src}${sep}autoplay=${autoplay ? '1' : '0'}&muted=1&playsinline=1&controls=0&loop=1" frameborder="0" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%"></iframe>`;
-            setMuted(true);
+          container.innerHTML = '';
+          const sep = String(src).includes('?') ? '&' : '?';
+          const iframe = document.createElement('iframe');
+          iframe.src = `${src}${sep}autoplay=${autoplay ? '1' : '0'}&muted=1&playsinline=1&controls=0&loop=1`;
+          iframe.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
+          iframe.allowFullscreen = true;
+          applyIframeStyles(iframe);
+          container.appendChild(iframe);
+          setMuted(true);
+
+          // try to attach player API to the iframe
+          try {
+            const mod2 = await import('@vimeo/player');
+            const Player2 = (mod2 as any).default ?? (mod2 as any).Player ?? (mod2 as any);
+            localPlayer = new Player2(iframe);
+            playerRef.current = localPlayer;
+            setHasPlayer(true);
+
+            // attach events and polling same as above
+            try {
+              await localPlayer.ready();
+            } catch {}
+            localPlayer.on && localPlayer.on('timeupdate', (data: any) => { if (mounted) setTime(Math.floor(data.seconds || 0)); });
+            if (localPoll) window.clearInterval(localPoll);
+            localPoll = window.setInterval(async () => {
+              if (!mounted || !localPlayer) return;
+              try {
+                const t = await localPlayer.getCurrentTime();
+                const d = await localPlayer.getDuration();
+                const paused = await localPlayer.getPaused();
+                if (mounted) {
+                  setTime(Math.floor(t || 0));
+                  setDuration(Math.floor(d || 0));
+                  setIsPlaying(!paused);
+                }
+              } catch {}
+            }, 500);
+            pollRef.current = localPoll;
+          } catch (e) {
+            // nothing else we can do — iframe will play but API may not be available
           }
-        } catch {}
+        } catch (e) {
+          // final fallback: leave container empty
+        }
       }
     })();
 
@@ -125,11 +204,20 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
       if (localPoll) window.clearInterval(localPoll);
       const toUnload = localPlayer ?? playerRef.current;
       if (toUnload && typeof toUnload.unload === 'function') {
-        toUnload.unload().catch(() => {});
+        try { toUnload.unload(); } catch {}
       }
+      try {
+        // attempt to remove event listeners if available
+        (playerRef.current as any)?.off && (playerRef.current as any).off('play');
+        (playerRef.current as any)?.off && (playerRef.current as any).off('pause');
+        (playerRef.current as any)?.off && (playerRef.current as any).off('timeupdate');
+        (playerRef.current as any)?.off && (playerRef.current as any).off('ended');
+      } catch {}
       playerRef.current = null;
       pollRef.current = null;
-      if (container) container.innerHTML = '';
+      if (container) {
+        try { container.innerHTML = ''; } catch {}
+      }
     };
   }, [src, autoplay]);
 
