@@ -73,7 +73,9 @@ const Header: React.FC<HeaderProps> = ({ selectedCategory, onSelectCategory, sel
           }
           .header-grid .text-left { display: none !important; } /* hide desktop left nav */
           .header-grid .text-right { display: none !important; } /* hide desktop right info link */
-          .header-center { order: 2; padding: 0 12px; }
+          /* ensure center column is centered on mobile */
+          .header-center { order: 2; padding: 0 12px; text-align: center !important; }
+          .header-center h1 { margin-left: 0 !important; margin-right: 0 !important; }
           .mobile-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
           .mobile-hamburger { display: inline-flex; align-items: center; justify-content: center; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: transparent; color: #EDEDED; }
           .mobile-nav { display: ${mobileOpen ? 'block' : 'none'}; padding: 8px 12px 0 12px; }
