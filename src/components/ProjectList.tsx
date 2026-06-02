@@ -7,6 +7,23 @@ const placeholder = (n: number) => `https://via.placeholder.com/1200x675?text=Pr
 
 const placeholderProjects: Project[] = [
   {
+    id: 'p0',
+    title: "Levis 'Denim Air'",
+    description: '',
+    thumbnail: 'denim.jpg',
+    link: 'https://vimeo.com/1197789971?share=copy&fl=sv&fe=ci',
+    category: 'Selected Work',
+    role: 'DIRECTOR',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    // @ts-ignore
+    credits: [
+      { role: 'Director', name: 'Miguel Verduzco' },
+      { role: 'DP', name: 'Luke Im' },
+      { role: 'Editor', name: 'Miguel Verduzco' },
+    ],
+  },
+  {
     id: 'p1',
     title: "Trujistas 'It's A Lifestyle'",
     description: '',
