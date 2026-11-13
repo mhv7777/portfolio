@@ -10,7 +10,6 @@ type LocationState = { project?: Project };
 const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean }> = ({ src, title, autoplay = true }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<any>(null);
-  const lastVolumeRef = useRef<number>(1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [duration, setDuration] = useState<number>(0);
   const [time, setTime] = useState<number>(0);
@@ -95,10 +94,10 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
         } catch {}
 
         try {
-          const vol = await player.getVolume();
-          lastVolumeRef.current = typeof vol === 'number' ? vol : lastVolumeRef.current || 1;
-          setMuted(lastVolumeRef.current === 0);
-        } catch {}
+          setMuted(await player.getMuted());
+        } catch (err) {
+          console.warn('player.getMuted() warning', err);
+        }
 
         // attach event handlers (no polling)
         try {
@@ -114,11 +113,9 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
           player.on('volumechange', async () => {
             if (!mounted) return;
             try {
-              const v = await player.getVolume();
-              lastVolumeRef.current = (typeof v === 'number') ? v : lastVolumeRef.current;
-              setMuted(lastVolumeRef.current === 0);
+              setMuted(await player.getMuted());
             } catch (err) {
-              // ignore — best-effort
+              console.warn('player.getMuted() warning', err);
             }
           });
         } catch (e) {
@@ -163,33 +160,14 @@ const VideoWrapper: React.FC<{ src?: string; title?: string; autoplay?: boolean 
 
   const toggleMute = async () => {
     const p = safePlayer();
-    if (!p) {
-      setMuted(prev => !prev);
-      return;
-    }
+    if (!p) return;
     try {
       await p.ready();
-      // read current volume and keep a sensible lastVolumeRef
-      const curVol = await p.getVolume();
-      const preserved = (typeof curVol === 'number' && curVol > 0) ? curVol : (lastVolumeRef.current || 1);
-      lastVolumeRef.current = preserved;
-
-      if (muted) {
-        // restore prior volume and verify
-        await p.setVolume(preserved);
-        const check = await p.getVolume();
-        const nowMuted = !(typeof check === 'number' && check > 0);
-        setMuted(nowMuted);
-      } else {
-        // mute and verify
-        await p.setVolume(0);
-        const check = await p.getVolume();
-        const nowMuted = !(typeof check === 'number' && check > 0);
-        setMuted(nowMuted);
-      }
+      const nowMuted = await p.getMuted();
+      await p.setMuted(!nowMuted);
+      setMuted(!nowMuted);
     } catch (e) {
       console.error('toggleMute error', e);
-      setMuted(prev => !prev);
     }
   };
 
